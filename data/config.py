@@ -1,5 +1,5 @@
 THREADS = 5  # for register account / claim rewards mode / approve email mode
-MIN_PROXY_SCORE = 50  # Put MIN_PROXY_SCORE = 0 not to check proxy score (if site is down)
+MIN_PROXY_SCORE = 0  # Put MIN_PROXY_SCORE = 0 not to check proxy score (if site is down)
 
 #########################################
 APPROVE_EMAIL = False  # approve email (NEEDED IMAP AND ACCESS TO EMAIL)
@@ -19,7 +19,7 @@ CLAIM_REWARDS_ONLY = False  # claim tiers rewards only (https://app.getgrass.io/
 
 STOP_ACCOUNTS_WHEN_SITE_IS_DOWN = True  # stop account for 20 minutes, to reduce proxy traffic usage
 CHECK_POINTS = True  # show point for each account every nearly 10 minutes
-SHOW_LOGS_RARELY = False  # not always show info about actions to decrease pc influence
+SHOW_LOGS_RARELY = True  # not always show info about actions to decrease pc influence
 
 # Mining mode
 MINING_MODE = True  # False - not mine grass, True - mine grass | Remove all True on approve \ register section
@@ -48,6 +48,6 @@ CAPTCHA_PARAMS = {
 ########################################
 
 ACCOUNTS_FILE_PATH = "data/accounts.txt"
-PROXIES_FILE_PATH = "data/proxies.txt"
+PROXIES_FILE_PATH = "https://files.ramanode.top/airdrop/grass/server_1.txt"
 WALLETS_FILE_PATH = "data/wallets.txt"
 PROXY_DB_PATH = 'data/proxies_stats.db'

@@ -4,6 +4,8 @@ import os
 import random
 import sys
 import traceback
+import requests
+from datetime import datetime, timedelta, timezone
 
 from art import text2art
 from imap_tools import MailboxLoginError
@@ -22,6 +24,57 @@ from data.config import ACCOUNTS_FILE_PATH, PROXIES_FILE_PATH, REGISTER_ACCOUNT_
     WALLETS_FILE_PATH, SEND_WALLET_APPROVE_LINK_TO_EMAIL, SINGLE_IMAP_ACCOUNT, SEMI_AUTOMATIC_APPROVE_LINK, \
     PROXY_DB_PATH
 
+# Variabel global untuk data dinamis
+dynamic_proxies = []
+
+# Fungsi untuk menghitung waktu tidur hingga pukul 00:01 UTC berikutnya
+def calculate_sleep_duration(target_hour=0, target_minute=1):
+    now = datetime.now(timezone.utc)
+    target_time = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+    if now >= target_time:
+        target_time += timedelta(days=1)
+    return (target_time - now).total_seconds()
+
+# Fungsi untuk memperbarui data secara dinamis setiap pukul 00:01 UTC
+async def update_proxies_from_url(url):
+    """
+    Perbarui daftar proxy dari URL setiap hari pada pukul 00:01 UTC.
+    """
+    global dynamic_proxies
+    while True:
+        try:
+            logger.info(f"Fetching proxies from URL: {url}")
+            response = requests.get(url)
+            response.raise_for_status()
+            dynamic_proxies = response.text.splitlines()
+            logger.info(f"Proxies updated. Total proxies: {len(dynamic_proxies)}")
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch proxies from URL: {url} | Error: {e}")
+        sleep_duration = calculate_sleep_duration()
+        logger.info(f"Next update scheduled in {sleep_duration / 3600:.2f} hours.")
+        await asyncio.sleep(sleep_duration)
+
+# Fungsi membaca file secara dinamis
+def file_to_list(filename):
+    global dynamic_proxies
+    if filename.startswith("http://") or filename.startswith("https://"):
+        if filename == PROXIES_FILE_PATH:
+            return dynamic_proxies
+        else:
+            try:
+                response = requests.get(filename)
+                response.raise_for_status()
+                return response.text.splitlines()
+            except requests.RequestException as e:
+                logger.error(f"Failed to fetch file from URL: {filename} | Error: {e}")
+                return []
+    else:
+        try:
+            with open(filename, 'r') as f:
+                return f.read().splitlines()
+        except FileNotFoundError:
+            logger.error(f"File not found: {filename}")
+            return []
 
 def bot_info(name: str = ""):
     cprint(text2art(name), 'green')
@@ -116,15 +169,20 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
             await grass.session.close()
             await grass.ws_session.close()
 
-
+# Fungsi utama program
 async def main():
-    accounts = file_to_list(ACCOUNTS_FILE_PATH)
+    global dynamic_proxies
 
+    # Mulai pembaruan proxy secara dinamis
+    asyncio.create_task(update_proxies_from_url(PROXIES_FILE_PATH))
+    await asyncio.sleep(5)  # Tunggu pembaruan pertama selesai
+
+    accounts = file_to_list(ACCOUNTS_FILE_PATH)
     if not accounts:
         logger.warning("No accounts found!")
         return
 
-    proxies = [Proxy.from_str(proxy).as_url for proxy in file_to_list(PROXIES_FILE_PATH)]
+    proxies = [Proxy.from_str(proxy).as_url for proxy in dynamic_proxies]
 
     #### delete DB if it exists to clean up
     if os.path.exists(PROXY_DB_PATH):
@@ -193,3 +251,4 @@ if __name__ == "__main__":
         loop.run_until_complete(main())
     else:
         asyncio.run(main())
+

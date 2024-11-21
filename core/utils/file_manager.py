@@ -1,18 +1,25 @@
+import os
+import requests
 from typing import Optional
 
 
-def file_to_list(
-        filename: str
-):
-    with open(filename, 'r+') as f:
-        return list(filter(bool, f.read().splitlines()))
+def file_to_list(filename: str):
+    if filename.startswith("http://") or filename.startswith("https://"):
+        try:
+            response = requests.get(filename)
+            response.raise_for_status()  # Pastikan respons sukses
+            return list(filter(bool, response.text.splitlines()))
+        except requests.RequestException as e:
+            raise FileNotFoundError(f"Error fetching URL {filename}: {e}")
+    elif os.path.exists(filename):
+        with open(filename, 'r+') as f:
+            return list(filter(bool, f.read().splitlines()))
+    else:
+        raise FileNotFoundError(f"No such file or URL: '{filename}'")
 
 
 def str_to_file(file_name: str, msg: str, mode: Optional[str] = "a"):
-    with open(
-            file_name,
-            mode
-    ) as text_file:
+    with open(file_name, mode) as text_file:
         text_file.write(f"{msg}\n")
 
 
