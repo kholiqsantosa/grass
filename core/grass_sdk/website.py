@@ -5,13 +5,15 @@ import json
 import random
 import time
 
+import curl_cffi.requests.exceptions as curl_exceptions
+
 import aiohttp
 import base58
 from tenacity import retry, stop_after_attempt, wait_random, retry_if_not_exception_type
 
 from core.utils import logger, loguru
 from core.utils.captcha_service import CaptchaService
-from core.utils.exception import LoginException, ProxyBlockedException, EmailApproveLinkNotFoundException, \
+from core.utils.exception import LoginException, ConnectionException, TimeoutException,  ProxyBlockedException, EmailApproveLinkNotFoundException, \
     RegistrationException
 from core.utils.generate.person import Person
 from core.utils.mail.mail import MailUtils
@@ -148,13 +150,14 @@ class GrassRest(BaseClient):
             stop=stop_after_attempt(12),
             retry=retry_if_not_exception_type((LoginException, ProxyBlockedException)),
             before_sleep=lambda retry_state, **kwargs: logger.info(f"{self.id} | Login retrying... "
-                                                                   f"{retry_state.outcome.exception()}"),
+                                                                   f" "),
             wait=wait_random(8, 12),
             reraise=True
         )
 
         return await handler(self.login)()
 
+    
     async def login(self):
         url = 'https://api.getgrass.io/login'
     
@@ -163,39 +166,43 @@ class GrassRest(BaseClient):
             'username': self.email,
         }
     
-        logger.info(f"{self.id} | Sending login request to {url} with data: {json_data}")
-    
         try:
-            response = await self.session.post(url, headers=self.website_headers, data=json.dumps(json_data), proxy=self.proxy)
+            response = await self.session.post(url, headers=self.website_headers, data=json.dumps(json_data),
+                                               proxy=self.proxy)
             logger.debug(f"{self.id} | Login response: {response.text}")
     
-            res_json = response.json()  # Assuming response is in JSON format
-            if res_json.get("error"):
-                error_message = res_json['error']['message']
-                logger.error(f"{self.email} | Login failed: {error_message}")
-                raise LoginException(f"{self.email} | Login stopped: {error_message}")
-    
-        except aiohttp.ClientResponseError as e:
-            logger.error(f"{self.id} | ClientResponseError during login: {e} - Response: {e.response.text}")
-            raise
-    
-        except aiohttp.ClientConnectionError as e:
-            logger.error(f"{self.id} | ClientConnectionError during login: {e}")
-            raise
-    
+            res_json = response.json()
+            if res_json.get("error") is not None:
+                raise LoginException(f"{self.email} | Login stopped: {res_json['error']['message']}")
+        except curl_exceptions.ProxyError as e:
+            logger.error(f"{self.id} | Proxy error: {e}")
+            raise ProxyBlockedException(f"Proxy issue encountered: {e}")
+        except curl_exceptions.ConnectionError as e:
+            logger.error(f"{self.id} | Connection error: {e}")
+            raise ConnectionException(f"Failed to connect to the server: {e}")
+        except curl_exceptions.CurlError as e:
+            if "(28)" in str(e):
+                logger.error(f"{self.id} | Timeout error: {e}")
+                raise TimeoutException("Request timed out. Please check server or network conditions.")
+            elif "(56)" in str(e):
+                logger.error(f"{self.id} | Proxy error: {e}")
+                raise ProxyBlockedException("Proxy connection failed.")
+            elif "(7)" in str(e):
+                logger.error(f"{self.id} | Connection refused: {e}")
+                raise ConnectionException("Server connection refused. Check if the server is reachable.")
+            else:
+                logger.error(f"{self.id} | Unexpected CurlError: {e}")
+                raise Exception(f"Unhandled CurlError: {e}")
         except Exception as e:
             logger.error(f"{self.id} | Unexpected error during login: {e}")
-            raise
+            raise e
     
         if response.status_code == 403:
-            logger.error(f"{self.id} | Proxy blocked during login: {response.text}")
             raise ProxyBlockedException(f"Login response: {response.text}")
-        
         if response.status_code != 200:
-            logger.error(f"{self.id} | Unexpected response status during login: {response.status_code} - {response.text}")
             raise aiohttp.ClientConnectionError(f"Login response: | {response.text}")
     
-        return res_json
+        return response.json()
 
     async def confirm_email(self, imap_pass: str):
         await self.send_approve_link(endpoint="sendEmailVerification")

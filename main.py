@@ -169,7 +169,7 @@ async def worker_task(_id, account: str, proxy: str = None, wallet: str = None, 
             await grass.session.close()
             await grass.ws_session.close()
 
-# Fungsi utama program
+
 async def main():
     global dynamic_proxies
 
@@ -178,6 +178,7 @@ async def main():
     await asyncio.sleep(5)  # Tunggu pembaruan pertama selesai
 
     accounts = file_to_list(ACCOUNTS_FILE_PATH)
+
     if not accounts:
         logger.warning("No accounts found!")
         return
@@ -251,4 +252,3 @@ if __name__ == "__main__":
         loop.run_until_complete(main())
     else:
         asyncio.run(main())
-

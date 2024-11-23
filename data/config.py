@@ -1,4 +1,4 @@
-THREADS = 5  # for register account / claim rewards mode / approve email mode
+THREADS = 100  # for register account / claim rewards mode / approve email mode
 MIN_PROXY_SCORE = 0  # Put MIN_PROXY_SCORE = 0 not to check proxy score (if site is down)
 
 #########################################
@@ -18,7 +18,7 @@ IMAP_DOMAIN = ""  # imap server domain (example: imap.firstmail.ltd for firstmai
 CLAIM_REWARDS_ONLY = False  # claim tiers rewards only (https://app.getgrass.io/dashboard/referral-program)
 
 STOP_ACCOUNTS_WHEN_SITE_IS_DOWN = True  # stop account for 20 minutes, to reduce proxy traffic usage
-CHECK_POINTS = True  # show point for each account every nearly 10 minutes
+CHECK_POINTS = False  # show point for each account every nearly 10 minutes
 SHOW_LOGS_RARELY = True  # not always show info about actions to decrease pc influence
 
 # Mining mode

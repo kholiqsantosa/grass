@@ -55,3 +55,7 @@ class EmailApproveLinkNotFoundException(Exception):
 
 class RegistrationException(Exception):
     pass
+
+
+class TimeoutException(Exception):
+    pass
